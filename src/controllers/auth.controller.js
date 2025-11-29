@@ -10,6 +10,13 @@ function sign(userId) {
   });
 }
 
+// общий безопасный геттер пользователя без пароля
+export async function getUserSafe(userId) {
+  if (!userId) return null;
+  const user = await User.findById(userId).select("-password");
+  return user || null;
+}
+
 // ============== REGISTER ==============
 export async function register(req, res) {
   try {
@@ -116,16 +123,42 @@ export async function isAuth(req, res) {
 }
 
 // ============== ME GET (получить данные пользователя) ==============
+// теперь умеет:
+//   GET /api/auth/me           -> текущий пользователь (по токену)
+//   GET /api/auth/me?id=XXX    -> пользователь по id
 export async function meGet(req, res) {
   try {
-    const user = await User.findById(req.userId).select("-password");
+    // приоритет: ?id в query, иначе текущий userId из middleware
+    const idFromQuery = req.query?.id;
+    const targetUserId = idFromQuery || req.userId;
+
+    const user = await getUserSafe(targetUserId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json({ user });
+
+    return res.json({ user });
   } catch (err) {
     console.error("ME GET ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  }
+}
+
+// ============== GET USER BY ID (отдельный handler, если пригодится) ==============
+// сейчас не привязан к роуту, но может использоваться внутри других контроллеров
+export async function getUserById(req, res) {
+  try {
+    const userId = req.params.id;
+    const user = await getUserSafe(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({ user });
+  } catch (err) {
+    console.error("USER GET BY ID ERROR:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 }
 
