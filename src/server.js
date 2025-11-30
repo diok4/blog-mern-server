@@ -17,8 +17,15 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors);
 
-app.use(cors({ origin: "*", credentials: true }));
+const cors = microCors({
+  origin: [
+    "https://blog-mern-client-git-main-diok4-projects.vercel.app",
+    "https://blog-mern-client-five.vercel.app",
+  ],
+  allowCredentials: true,
+});
 
 mongoose
   .connect(process.env.MONGO_URI)
