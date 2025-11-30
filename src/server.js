@@ -5,6 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import morgan from "morgan";
+import microCors from "micro-cors";
 
 import authRoutes from "./routes/auth.routes.js";
 import postsRoutes from "./routes/posts.routes.js";
