@@ -21,6 +21,4 @@ router.get("/isauth", isAuth);
 
 router.get("/me", auth, meGet);
 
-router.patch("/me", auth, mePatch);
-
 export default router;
