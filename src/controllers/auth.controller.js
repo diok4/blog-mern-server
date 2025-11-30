@@ -1,22 +1,23 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/user.js";
-import { setAuthCookie, clearAuthCookie } from "../middlewares/auth.js";
 
-function sign(userId) {
+function generateToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-    algorithm: "HS256",
+    expiresIn: "7d",
   });
 }
 
-export async function getUserSafe(userId) {
-  if (!userId) return null;
-  const user = await User.findById(userId).select("-password");
-  return user || null;
+function sendAuthCookie(res, token) {
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
 }
 
-// ============== REGISTER ==============
 export async function register(req, res) {
   try {
     const { email, password, username } = req.body;
@@ -25,33 +26,32 @@ export async function register(req, res) {
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    const exist = await User.findOne({ email });
-    if (exist) {
+    const exists = await User.findOne({ email });
+    if (exists) {
       return res.status(409).json({ message: "Email already registered" });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       email,
       username,
-      password: hash,
+      password: hashed,
     });
 
-    const token = sign(user.id);
-    setAuthCookie(res, token);
+    const token = generateToken(user.id);
+    sendAuthCookie(res, token);
 
     const safeUser = user.toObject();
     delete safeUser.password;
 
-    res.status(201).json({ user: safeUser });
+    return res.status(201).json({ user: safeUser });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 }
 
-// ============== LOGIN ==============
 export async function login(req, res) {
   try {
     const { email, password } = req.body;
@@ -70,23 +70,28 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = sign(user.id);
-    setAuthCookie(res, token);
+    const token = generateToken(user.id);
+    sendAuthCookie(res, token);
 
     const safeUser = user.toObject();
     delete safeUser.password;
 
-    res.json({ user: safeUser });
+    return res.json({ user: safeUser });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 }
 
-// ============== LOGOUT ==============
 export async function logout(_req, res) {
   try {
-    clearAuthCookie(res);
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+    });
+
     res.json({ message: "Logged out" });
   } catch (err) {
     console.error("LOGOUT ERROR:", err);
@@ -94,13 +99,10 @@ export async function logout(_req, res) {
   }
 }
 
-// ============== IS AUTH ==============
 export async function isAuth(req, res) {
   try {
     const token = req.cookies?.token;
-    if (!token) {
-      return res.json({ authenticated: false });
-    }
+    if (!token) return res.json({ authenticated: false });
 
     let payload;
     try {
@@ -109,10 +111,8 @@ export async function isAuth(req, res) {
       return res.json({ authenticated: false });
     }
 
-    const user = await User.findById(payload.userId).select("_id");
-    if (!user) {
-      return res.json({ authenticated: false });
-    }
+    const user = await User.findById(payload.userId);
+    if (!user) return res.json({ authenticated: false });
 
     return res.json({ authenticated: true });
   } catch (err) {
@@ -121,65 +121,24 @@ export async function isAuth(req, res) {
   }
 }
 
-// ============== ME GET (получить данные пользователя) ==============
-
 export async function meGet(req, res) {
   try {
-    const idFromQuery = req.query?.id;
-    const targetUserId = idFromQuery || req.userId;
+    const token = req.cookies?.token;
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-    const user = await getUserSafe(targetUserId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: "Unauthorized" });
     }
+
+    const user = await User.findById(payload.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     return res.json({ user });
   } catch (err) {
-    console.error("ME GET ERROR:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-}
-
-// ============== GET USER BY ID  ==============
-export async function getUserById(req, res) {
-  try {
-    const userId = req.params.id;
-    const user = await getUserSafe(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    return res.json({ user });
-  } catch (err) {
-    console.error("USER GET BY ID ERROR:", err);
+    console.error("ME ERROR:", err);
     return res.status(500).json({ message: "Server error" });
-  }
-}
-
-// ============== ME PATCH ==============
-export async function mePatch(req, res) {
-  try {
-    const { username, avatar } = req.body;
-
-    const update = {
-      ...(username && { username }),
-      ...(avatar && { avatar }),
-    };
-
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { $set: update },
-      { new: true }
-    ).select("-password");
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ user });
-  } catch (err) {
-    console.error("ME PATCH ERROR:", err);
-    res.status(500).json({ message: "Server error" });
   }
 }
