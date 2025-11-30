@@ -10,7 +10,6 @@ function sign(userId) {
   });
 }
 
-// общий безопасный геттер пользователя без пароля
 export async function getUserSafe(userId) {
   if (!userId) return null;
   const user = await User.findById(userId).select("-password");
@@ -123,12 +122,9 @@ export async function isAuth(req, res) {
 }
 
 // ============== ME GET (получить данные пользователя) ==============
-// теперь умеет:
-//   GET /api/auth/me           -> текущий пользователь (по токену)
-//   GET /api/auth/me?id=XXX    -> пользователь по id
+
 export async function meGet(req, res) {
   try {
-    // приоритет: ?id в query, иначе текущий userId из middleware
     const idFromQuery = req.query?.id;
     const targetUserId = idFromQuery || req.userId;
 
@@ -144,8 +140,7 @@ export async function meGet(req, res) {
   }
 }
 
-// ============== GET USER BY ID (отдельный handler, если пригодится) ==============
-// сейчас не привязан к роуту, но может использоваться внутри других контроллеров
+// ============== GET USER BY ID  ==============
 export async function getUserById(req, res) {
   try {
     const userId = req.params.id;
@@ -162,7 +157,7 @@ export async function getUserById(req, res) {
   }
 }
 
-// ============== ME PATCH (обновить username / avatar) ==============
+// ============== ME PATCH ==============
 export async function mePatch(req, res) {
   try {
     const { username, avatar } = req.body;
