@@ -5,7 +5,6 @@ import {
   logout,
   isAuth,
   meGet,
-  mePatch,
 } from "../controllers/auth.controller.js";
 import { auth } from "../middlewares/auth.js";
 
