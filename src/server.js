@@ -20,36 +20,25 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://sendpostclient.vercel.app",
-];
-
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
+    origin: ["http://localhost:5173", "https://sendpostclient.vercel.app"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.options(
   "*",
   cors({
-    origin: allowedOrigins,
+    origin: ["http://localhost:5173", "https://sendpostclient.vercel.app"],
     credentials: true,
   })
 );
 
 mongoose
-  .connect(process.env.FRONTEND_ORIGINS)
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => {
     console.error("MongoDB error:", err);
