@@ -15,14 +15,9 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-app.use(helmet());
-app.use(morgan("dev"));
-app.use(express.json());
-app.use(cookieParser());
-
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://sendpost-seven.vercel.app/"],
+    origin: ["http://localhost:5173", "https://sendpost-seven.vercel.app"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -32,10 +27,18 @@ app.use(
 app.options(
   "*",
   cors({
-    origin: ["http://localhost:5173", "https://sendpost-seven.vercel.app/"],
+    origin: ["http://localhost:5173", "https://sendpost-seven.vercel.app"],
     credentials: true,
   })
 );
+
+app.use(helmet());
+app.use(morgan("dev"));
+app.use(express.json());
+app.use(cookieParser());
+
+app.use("/api/auth", authRoutes);
+app.use("/api/posts", postsRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
@@ -44,9 +47,6 @@ mongoose
     console.error("MongoDB error:", err);
     process.exit(1);
   });
-
-app.use("/api/auth", authRoutes);
-app.use("/api/posts", postsRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
