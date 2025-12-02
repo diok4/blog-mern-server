@@ -18,6 +18,14 @@ function sendAuthCookie(res, token) {
   });
 }
 
+function getTokenFromRequest(req) {
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return null;
+}
+
 export async function register(req, res) {
   try {
     const { email, password, username } = req.body;
@@ -40,12 +48,11 @@ export async function register(req, res) {
     });
 
     const token = generateToken(user.id);
-    sendAuthCookie(res, token);
 
     const safeUser = user.toObject();
     delete safeUser.password;
 
-    return res.status(201).json({ user: safeUser });
+    return res.status(201).json({ user: safeUser, token });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -71,12 +78,11 @@ export async function login(req, res) {
     }
 
     const token = generateToken(user.id);
-    sendAuthCookie(res, token);
 
     const safeUser = user.toObject();
     delete safeUser.password;
 
-    return res.json({ user: safeUser });
+    return res.json({ user: safeUser, token });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -101,8 +107,11 @@ export async function logout(_req, res) {
 
 export async function isAuth(req, res) {
   try {
-    const token = req.cookies?.token;
-    if (!token) return res.json({ authenticated: false });
+    const token = getTokenFromRequest(req);
+
+    if (!token) {
+      return res.json({ authenticated: false });
+    }
 
     let payload;
     try {
@@ -112,7 +121,9 @@ export async function isAuth(req, res) {
     }
 
     const user = await User.findById(payload.userId);
-    if (!user) return res.json({ authenticated: false });
+    if (!user) {
+      return res.json({ authenticated: false });
+    }
 
     return res.json({ authenticated: true });
   } catch (err) {
@@ -123,8 +134,11 @@ export async function isAuth(req, res) {
 
 export async function meGet(req, res) {
   try {
-    const token = req.cookies?.token;
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const token = getTokenFromRequest(req);
+
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     let payload;
     try {
